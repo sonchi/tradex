@@ -2,7 +2,7 @@ import threading
 
 # Initialize the books for all products. We keep one book per product.
 # Each book contains @capacity snapshots updated in a round-robin
-# fashion by the BookKeeper of the corresponding product.
+# fashion by the BookWriter of the corresponding product.
 # Each snapshot contains a 'bids' dictionary and an 'asks' dictionary
 # initialized to empty lists.
 #
@@ -51,7 +51,7 @@ def init_books(products, capacity):
   return books
 
 # BOOK_INDEX maps a product to the index of the most up-to-date snapshot in the list.
-# The value is stored in a list to pass it by reference to BookKeeper instances.
+# The value is stored in a list to pass it by reference to BookWriter instances.
 #
 # Suppose
 #   BOOK_INDEX['BTC-USD'] == [5] , then
@@ -77,7 +77,7 @@ def init_locks(products):
     locks[p] = threading.Lock()
   return locks
 
-BOOK_CAPACITY = 30
+BOOK_CAPACITY = 16
 
 PRODUCTS = ['BTC-USD', 'LTC-USD', 'ETH-USD', 'ETH-BTC', 'LTC-BTC']
 

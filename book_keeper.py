@@ -1,14 +1,10 @@
 import gdax
+import json
 import threading
 import time
-import random
-from globals import BOOKS, BOOK_CAPACITY
-from globals import BOOK_INDEX
-from globals import PRODUCTS
-from globals import LOCKS
+from globals import BOOKS, BOOK_CAPACITY, BOOK_INDEX, LOCKS, PRODUCTS
 
-
-class BookKeeper(threading.Thread):
+class BookWriter(threading.Thread):
   def __init__(self, product, books, book_index, locks):
     threading.Thread.__init__(self)
     self.daemon = True
@@ -26,52 +22,57 @@ class BookKeeper(threading.Thread):
 
   def run(self):
     exceed_count = 0
+    update_count = 0
     while True:
-      book = self.public_client.get_product_order_book(self.product, level=2)
+      try:
+        book = self.public_client.get_product_order_book(self.product, level=1)
+      except json.decoder.JSONDecodeError:
+        continue
       if 'message' in book:
+        # linear back off
         exceed_count = exceed_count + 1
-        print('{} XXXXXX {}'.format(self.product, exceed_count))
         time.sleep(0.5 * exceed_count)
+        # print('{} exceeded limits, update count:{}, exceed_count:{}'.format(self.product, update_count, exceed_count))
         continue
       else:
         exceed_count = 0
       # Increment the index, this is the index of the book that we are updating.
       index_ = (self.book_index[0] + 1) % BOOK_CAPACITY
-      #print('Updating {} for {}'.format(index_, self.product))
+      # print('Updating {} for {}'.format(index_, self.product))
       # Update the book at index_
       self.book[index_]['bids'] = book['bids'].copy()
       self.book[index_]['asks'] = book['asks'].copy()
-      # Update the shared book index.
+      # Update the shared book index
       with self.lock:
         self.book_index[0] = index_
+      update_count = update_count + 1
 
-class BookReader(threading.Thread):
+class BookReader():
   def __init__(self):
-    threading.Thread.__init__(self)
-    self.daemon = True
     # Warm up for book keepers
     time.sleep(5)
 
-  def run(self):
-    while True:
-      print('\n\n')
-      for p in PRODUCTS:
-        index_ = -1
-        with LOCKS[p]:
-          index_ = BOOK_INDEX[p][0]
-        print('{} index {}'.format(p, index_))
-      print('\n\n')
-      time.sleep(1)
+  def bid(self, product):
+    with LOCKS[product]:
+      index_ = BOOK_INDEX[product][0]
+    return BOOKS[product][index_]['bids']
 
+  def ask(self, product):
+    with LOCKS[product]:
+      index_ = BOOK_INDEX[product][0]
+    return BOOKS[product][index_]['asks']
 
-if __name__ == '__main__':
-  thread_list = list()
-  for p in PRODUCTS:
-    t = BookKeeper(p, BOOKS, BOOK_INDEX, LOCKS)
-    thread_list.append(t)
-  for t in thread_list:
-    t.start()
-  r = BookReader()
-  r.start()
-  while True:
-    time.sleep(1)
+# if __name__ == '__main__':
+#   writers = list()
+#   for p in PRODUCTS:
+#     w = BookWriter(p, BOOKS, BOOK_INDEX, LOCKS)
+#     writers.append(w)
+#   for w in writers:
+#     w.start()
+#   r = BookReader()
+#   while True:
+#     time.sleep(1)
+#     for p in PRODUCTS:
+#       print('\n\n{}'.format(p))
+#       print('\n\nbids \n\n {}'.format(r.bid(p)))
+#       print('\n\nasks \n\n {}'.format(r.ask(p)))
