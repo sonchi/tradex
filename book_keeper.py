@@ -21,8 +21,8 @@ class BookWriter(threading.Thread):
     self.public_client = gdax.PublicClient()
 
   def run(self):
-    exceed_count = 0
     update_count = 0
+    start = time.time()
     while True:
       try:
         book = self.public_client.get_product_order_book(self.product, level=1)
@@ -32,15 +32,16 @@ class BookWriter(threading.Thread):
         continue
       if 'message' in book:
         # linear back off
-        exceed_count = exceed_count + 1
-        time.sleep(0.5 * exceed_count)
-        # print('{} exceeded limits, update count:{}, exceed_count:{}'.format(self.product, update_count, exceed_count))
+        time.sleep(0.5)
+        seconds = time.time() -  start
+        up_s = float(update_count) / seconds
+        #print('{} exceeded limits, update count:{}, updates/s: {:0.2f}'.
+        #      format(self.product, update_count, up_s))
         continue
       else:
         exceed_count = 0
       # Increment the index, this is the index of the book that we are updating.
       index_ = (self.book_index[0] + 1) % BOOK_CAPACITY
-      # print('Updating {} for {}'.format(index_, self.product))
       # Update the book at index_
       self.book[index_]['bids'] = book['bids'].copy()
       self.book[index_]['asks'] = book['asks'].copy()
@@ -48,6 +49,7 @@ class BookWriter(threading.Thread):
       with self.lock:
         self.book_index[0] = index_
       update_count = update_count + 1
+      time.sleep(1)
 
 class BookReader():
   def __init__(self):
@@ -64,17 +66,17 @@ class BookReader():
       index_ = BOOK_INDEX[product][0]
     return BOOKS[product][index_]['asks']
 
-# if __name__ == '__main__':
-#   writers = list()
-#   for p in PRODUCTS:
-#     w = BookWriter(p, BOOKS, BOOK_INDEX, LOCKS)
-#     writers.append(w)
-#   for w in writers:
-#     w.start()
-#   r = BookReader()
-#   while True:
-#     time.sleep(1)
-#     for p in PRODUCTS:
-#       print('\n\n{}'.format(p))
-#       print('\n\nbids \n\n {}'.format(r.bid(p)))
-#       print('\n\nasks \n\n {}'.format(r.ask(p)))
+if __name__ == '__main__':
+  writers = list()
+  for p in PRODUCTS:
+    w = BookWriter(p, BOOKS, BOOK_INDEX, LOCKS)
+    writers.append(w)
+  for w in writers:
+    w.start()
+  r = BookReader()
+  while True:
+    time.sleep(1)
+    # for p in PRODUCTS:
+    #   print('\n\n{}'.format(p))
+    #   print('\n\nbids \n\n {}'.format(r.bid(p)))
+    #   print('\n\nasks \n\n {}'.format(r.ask(p)))
