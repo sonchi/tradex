@@ -26,7 +26,7 @@ class BookWriter(threading.Thread):
     while True:
       try:
         book = self.public_client.get_product_order_book(self.product, level=1)
-      except (json.decoder.JSONDecodeError, ValueError) as e:
+      except (json.decoder.JSONDecodeError, ValueError, AttributeError) as e:
         continue
       if 'message' in book:
         # linear back off
