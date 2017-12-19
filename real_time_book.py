@@ -27,7 +27,7 @@ class RealTimeBooks():
       try:
         value = self.books[product].get_bid()
         done = False if value is None else True
-      except AttributeError:
+      except (AttributeError, ValueError) as e:
         continue
     return value
 
@@ -40,7 +40,7 @@ class RealTimeBooks():
       try:
         value = self.books[product].get_ask()
         done = False if value is None else True
-      except AttributeError:
+      except (AttributeError, ValueError) as e:
         continue
     return value
 
